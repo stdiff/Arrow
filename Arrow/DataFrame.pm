@@ -807,21 +807,19 @@ sub select {
     if ($remove eq '-') {
       @selected = 0..($self->ncol()-1) if @selected == 0;
 
-      my %selected_as_set = map { $_ => 1 } @selected;
-      foreach my $item (@given) {
-	  $selected_as_set{$item} = 0 if defined $selected_as_set{$item};
-	}
-      @selected = grep { $selected_as_set{$_} == 1 } keys %selected_as_set;
+      my $is_given = sub { my $x = shift; grep { $x == $_ } @given };
+      @selected = grep { not $is_given->($_) } @selected;
 
     } else {
       # duplicate is 'not' allowed
-      my %tmp = map { $_ => 1 } (@selected,@given);
-      @selected = keys %tmp;
+      foreach my $x (@given) {
+	push(@selected,$x) unless grep { $_ == $x } @selected;
+      }
     }
+
   }
 
   croak "No columns are (finally) selected." if @selected == 0;
-  use Data::Dumper; print Dumper(\@selected);
   #@selected = sort { $a <=> $b } @selected;
 
   my @names = @{$self->names}[@selected];
