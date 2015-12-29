@@ -1,5 +1,5 @@
 package Arrow::DataFrame;
-# >Last Modified on Thu, 17 Dec 2015< 
+# >Last Modified on Tue, 29 Dec 2015< 
 use strict;
 use warnings;
 use utf8;
@@ -121,7 +121,7 @@ sub matrix_to_dataframe {
     @$names = map { "X$_" } 0..$p;
   }
 
-  my $df = DataFrame->new(names=>$names);
+  my $df = Arrow::DataFrame->new(names=>$names);
 
   foreach my $i (1..$n) {
     my $row = $matrix->row($i);
@@ -821,7 +821,8 @@ sub select {
   }
 
   croak "No columns are (finally) selected." if @selected == 0;
-  @selected = sort { $a <=> $b } @selected;
+  use Data::Dumper; print Dumper(\@selected);
+  #@selected = sort { $a <=> $b } @selected;
 
   my @names = @{$self->names}[@selected];
   my $n = $self->nrow;
