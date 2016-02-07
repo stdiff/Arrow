@@ -29,4 +29,5 @@ This Perl module provides a degenerated variant of a data frame in R. The names 
 
 ## ChangeLog
 
-- 2015/12/17 : In Internet.
+- 2015/12/29 : select() preserves the given order
+- 2015/12/17 : the first commit.
