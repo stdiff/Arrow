@@ -687,16 +687,42 @@ sub complete_cases {
 
 ########################## Converting a wide table to a long one and vice versa
 sub melt {
-  return $_[0];
+  # $self
+  # id | var0 | var1 | var2 | var3 |
+  # $self->melt(id=>'id'); # vars => ['var0',...,'var3']
+
+  my $self = shift;
+  my %pref = @_;
+
+  croak "" if not defined $pref{id};
+  my $id_col_num = $self->names_to_cols($pref{id});   # col number of ID (0)
+  my $id_col_name = $self->cols_to_names($id_col_num);# col name of ID (id)
+
+  my $var_index; # col numbers of variables [1,2,3,4]
+  if (defined $pref{measure_vars}) {
+    $var_index = $self->names_to_cols($pref{measure_vars});
+  } else {
+    my @names = @{$self->names};
+    $var_index = [grep { $names[$_] ne $id_col_name } 0..$#names];
+  }
+
+  my $vars = $self->cols_to_names($var_index); ## names of variables 
+
+  my $long = Arrow::DataFrame->new(names=>[$id_col_name,'variable','value']);
+
+  foreach my $i (0..($self->nrow()-1)) {
+    my $row = $self->rows_hash($i);
+    my $id = $row->{$id_col_name};
+    foreach my $var (@$vars) {
+      my $val = $row->{$var};
+      $long = $long->rbind([$id,$var,$val]) if defined $val;
+    }
+  }
+
+  return $long;
 }
 
 sub dcast {
-  ### dcast($df, index=>'col0', columns=>'col1', values=>'col2');
-  ### We follow the notation of pandas' pivot() method. 
-  ### long to wide. 0 is assigned to a missing value.
-  ###
-  ### index(col0) | col1(1) | col1(2) | col1(3) | ....
-  ### 
   my $self = shift;
   my %pref = @_;
 
@@ -1656,13 +1682,17 @@ Not yet.
 
 =head3 melt
 
-not yet
+This method converts a wide table to a long one.
+
+   $df->melt(id=>'col0',measure_vars=>$cols);
+
+The column names of the melted data frame would be ['col0','variable','value'].
 
 =head3 dcast
 
 This method converts a long table to a wide one. 
 
-   $df->dcast(index=>'id',columns=>'variable',values=>'vals',fill=>'0');
+   $df->dcast(index=>'col0',columns=>'col1',values=>'col2',fill=>'0');
 
 (We follow the usage of pandas' pivot()-method.) If the 'fill' option is given, then the empty cells are filled by the specified value.
 
