@@ -691,7 +691,39 @@ sub melt {
 }
 
 sub dcast {
-  return $_[0];
+  ### dcast($df, index=>'col0', columns=>'col1', values=>'col2');
+  ### We follow the notation of pandas' pivot() method. 
+  ### long to wide. 0 is assigned to a missing value.
+  ###
+  ### index(col0) | col1(1) | col1(2) | col1(3) | ....
+  ### 
+  my $self = shift;
+  my %pref = @_;
+
+  my $id_num = $self->names_to_cols($pref{index});    # column number of IDs
+  my $col_num = $self->names_to_cols($pref{columns}); # column number of vars
+  my $val_num = $self->names_to_cols($pref{values});  # column number of vals
+
+  my @indexes = uniq @{$self->cols($pref{index})}; # array of IDs
+  my @names = uniq @{$self->cols($pref{columns})}; # array of vars
+  @names = sort @names; # for compatibility with R
+  my @columns = @names; # array of vars (except 'index')
+  @names = ($self->cols_to_names($id_num),@names);
+
+  my $wide = Arrow::DataFrame->new(names=>\@names);
+
+  foreach my $index (@indexes) {
+    my $subdf = $self->filter(sub { $_[$id_num] eq $index });
+
+    my %row_hash; ##variable => value
+    $subdf->rapply(sub { $row_hash{$_[$col_num]} = $_[$val_num] });
+
+    my @row = map {defined $row_hash{$_} ? $row_hash{$_} : $pref{fill}} @columns;
+    @row = ($index,@row);
+    $wide = $wide->rbind(\@row);
+  }
+
+  return $wide;
 }
 
 
@@ -1478,6 +1510,8 @@ This converts column numbers to the corresponding column names.
    $df->cols_to_names([3,1]);              # gives ['col3','col1']
    $df->cols_to_names([0..$df->ncol()-1]); # equiv to $df->names;
 
+If we give a string which does not belong to names, then it produces an error.
+
 =head3 rows($rows)
 
 This gives the specified rows ($rows).
@@ -1626,7 +1660,11 @@ not yet
 
 =head3 dcast
 
-not yet
+This method converts a long table to a wide one. 
+
+   $df->dcast(index=>'id',columns=>'variable',values=>'vals',fill=>'0');
+
+(We follow the usage of pandas' pivot()-method.) If the 'fill' option is given, then the empty cells are filled by the specified value.
 
 =head2 methods corresponding to functions of dplyr in R
 
