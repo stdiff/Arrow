@@ -1,5 +1,5 @@
 package Arrow::DataFrame;
-# >Last Modified on Tue, 29 Dec 2015< 
+# >Last Modified on Wed, 10 Feb 2016< 
 use strict;
 use warnings;
 use utf8;
@@ -248,7 +248,7 @@ sub show {
   my $n = $self->nrow;
   ### initialisation of the preference
   $pref{separator} ||= $self->separator;
-  $pref{width} = $self->width unless defined($pref{width}); 
+  $pref{width} = $self->width if not $pref{width};
   $pref{from} ||= 0;
   $pref{to} = $n-1 unless defined($pref{to});
 
@@ -816,7 +816,6 @@ sub select {
 	push(@selected,$x) unless grep { $_ == $x } @selected;
       }
     }
-
   }
 
   croak "No columns are (finally) selected." if @selected == 0;
@@ -1231,11 +1230,13 @@ This causes a problem when we use a column name.
 
 =head2 Rules for methods
 
-1. When specifying more than 1 rows or columns, we use an arrayref.
+1. When specifying more than 1 rows or columns, we use an arrayref. 
 
    my @cols = qw(col0 col2);
    $df->method(\@cols); # ok
    $df->method(@cols);  # no
+
+  But the functions corresponding to the dplyr do not have to follow the above rules.
 
 2. When specifying more than 1 columns, we may use of names (e.g. col0, col2) or indexes (e.g. 0, 2). But it is not allowed to use a name and an index at the same time.
 
@@ -1271,6 +1272,8 @@ or
    $df->method_th(sub{ my $row = shift; $row{'col2'} == 2015 });
 
 7. A return value of a method should always be a scalar.
+
+
 
 =head1 METHOD
 
