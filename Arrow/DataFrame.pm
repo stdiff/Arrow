@@ -27,7 +27,7 @@ sub new {
   }
 
   ## display options
-  $df{width} = 6;
+  $df{width} = 8;
   $df{separator} = '|';
 
   return bless \%df, $class;
