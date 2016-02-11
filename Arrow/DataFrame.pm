@@ -1,5 +1,5 @@
 package Arrow::DataFrame;
-# >Last Modified on Wed, 10 Feb 2016< 
+# >Last Modified on Thu, 11 Feb 2016< 
 use strict;
 use warnings;
 use utf8;
@@ -10,6 +10,7 @@ use Text::CSV;
 # use Text::CSV::Encoded;
 use Math::MatrixReal;
 
+use Arrow::GroupBy;
 
 ######################################### Constructors
 sub new {
@@ -537,7 +538,7 @@ sub cbind {
   if (ref $_[0] eq 'Arrow::DataFrame') {
     my $additional_df = shift;
     my $m = $additional_df->nrow;
-    croak "The numbers of rows do not agree. ($n != $m)" if $n != $m;
+    croak "The numbers of rows do not agree. ($n != $m) for cbind()" if $n != $m;
 
     $new_df->add_name($_) foreach @{$additional_df->names};
     foreach my $i (0..($n-1)) {
@@ -588,7 +589,7 @@ sub rbind {
     ### an arrayref is given.
     my @array = @$additional_data;
     my $p = $new_df->ncol;
-    croak "The length of the given array is not suitable." if @array != $p;
+    croak "The given array (@array) is not suitable for rbind()" if @array != $p;
 
     ### convert "" to undef
     @array = map { if (defined($_) && $_ eq "") { undef } else { $_ }} @array;
@@ -721,6 +722,7 @@ sub melt {
 
   return $long;
 }
+
 
 sub dcast {
   my $self = shift;
@@ -1037,6 +1039,57 @@ sub summarise {
   return Arrow::DataFrame->new(rows=>[\@row],names=>\@names);
 }
 
+sub summarize {
+  my $self = shift;
+  return $self->summarise(@_);
+}
+
+
+sub group_by {
+  my $self = shift;
+  my @levels = map { /^\d+$/ ? $self->cols_to_names->($_) : $_ } @_;
+
+  my %level_values;
+  $level_values{$_} = [uniq @{$self->cols($_)}] foreach (@levels);
+
+  my @groups; 
+  foreach my $level (@levels) { 
+    if (@groups==0) {
+      @groups = map { [$_] } @{$level_values{$level}};
+    } else {
+      my @tuples;
+      foreach my $tuple (@groups) {
+	push(@tuples,[@$tuple,$_]) foreach (@{$level_values{$level}});
+      }
+      @groups = @tuples;
+    }
+  }
+
+  # if v5.10 or later is available, we can use smart match.
+  my $value_check = sub {
+    my $group = shift;
+    my $row_hash = shift;
+    my @vals = map { $row_hash->{$_} } @levels; # values at level columns
+
+    my $agree = 1;
+    foreach my $j (0..$#vals) {
+      if ($group->[$j] ne $vals[$j]) {
+	$agree = 0;
+	last;
+      }
+    }
+    return $agree;
+  };
+
+  my @data;
+  my @minuslevel = map { "-$_" } @levels;
+  foreach my $group (@groups) {
+    my $subset = $self->filter_th(sub {$value_check->($group,$_[0])});
+    push(@data,[@$group,$subset->select(@minuslevel)]) if $subset->nrow != 0;
+  }
+
+  return Arrow::GroupBy->new(levels=>\@levels,data=>\@data);
+}
 
 ########################################################################### misc
 
@@ -1736,7 +1789,7 @@ This gives a new data frame which is sorted by columns 'year', 'month' and 'day'
 
 =back
 
-To sort the rows in descending order, put `["col1",desc=>1]` instead of "col1". To use "cmp" for comparison, put `["col1",cmp=>]` intead. The value of cmp accepts also a function refernce. For example, 
+To sort the rows in descending order, put `["col1",desc=>1]` instead of "col1". To use "cmp" for comparison, put `["col1",cmp=> ...]` intead. The value of cmp accepts also a function refernce. For example, 
 
    $df->arrange(["name",desc=>1,cmp=>sub {$_[0] cmp $_[1]}]);
 
@@ -1821,7 +1874,7 @@ When we want to use column names for the function references, use `mutate_th()`.
 
 Not yet implemented. Use mutate() and select().
 
-=head3 summarise() 
+=head3 summarise() (or summarize())
 
 This method produce a data frame consisting of a single row. In an example
 
@@ -1835,9 +1888,56 @@ We can give several triples:
 
    $df->summarise( ['ave0', \&func0, 'col0'] , ['ave1', \&func1, 'col1'], ...);
 
-=head3 groupby
+=head2 GroupBy object
 
-Not yet implemented.
+Roughly speaking, a (Arrow::)GroupBy object is an object like a data frame such that the last elements of rows are data frame with the same column names. The name of the last column is 'data_frame' and other column is called a 'level'. (This name is of course not general.) This object can be used to group a data frame by the values of specified columns.
+
+Note that B<a GroupBy object is not a DataFrame object>.
+
+=head3 group_by
+
+This method creates a GroupBy object. 
+
+   $grpd = $df->group_by('origin','cylinders');
+
+Then $grpd contains a data frame whose colunm names are 'origin', 'cylinders' and 'data_frame'. The first two columns (called 'levels') consist of distinct pairs of values of the two columns of $df. If the first two elements of a row is 1 and 8, then the third (last) element is a data frame given by 
+
+   $df->filter_th(sub {$_[0]{origin} == 1 && $_[0]{cylinders} == 8});
+
+=head3 level_values
+
+   $grpd->level_values;
+
+This produces the data frame consisting only of levels columns. (The data frame is same as $df->distinct('origin','cylinders').)
+
+=head3 cat
+
+This method is basically the inverse of group_by() (up to orders of columns). 
+
+   $grpd->cat;
+
+This produces a single data frame consisting of grouped data frames (and the level columns). 
+
+=head3 summarise (or summarize)
+
+This method applies an aggregate function to the column of each grouped data frame and show the result as a single data frame.
+
+   $grpd->summarise(['sum_mpg',\&sum,'mpg']);
+
+This creates a data frame whose last column consists of the sums of the columns 'mpg' of all grouped data frame (if &sum is suitably defined). The column name is 'sum_mpg'.
+
+=head3 filter(_th), slice, arrange, select, rename, distinct, mutate(_th)
+
+These methods give a GroupBy object. They apply the method of the same name as ones for DataFrame to each grouped data frame. The group whose data frame has no rows will be removed. For example 
+
+   $grpd->level_values;
+
+contains 9 rows, while
+
+   $grpd->filter_th(sub { $_[0]{name} =~ /honda/ })->level_values;
+
+contains only one row.
+
 
 =head1 TODO
 

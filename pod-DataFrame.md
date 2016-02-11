@@ -71,11 +71,13 @@ This causes a problem when we use a column name.
 
 ## Rules for methods
 
-1\. When specifying more than 1 rows or columns, we use an arrayref.
+1\. When specifying more than 1 rows or columns, we use an arrayref. 
 
-    my @cols = qw(col0 col2);
-    $df->method(\@cols); # ok
-    $df->method(@cols);  # no
+     my @cols = qw(col0 col2);
+     $df->method(\@cols); # ok
+     $df->method(@cols);  # no
+
+    But the functions corresponding to the dplyr do not have to follow the above rules.
 
 2\. When specifying more than 1 columns, we may use of names (e.g. col0, col2) or indexes (e.g. 0, 2). But it is not allowed to use a name and an index at the same time.
 
@@ -298,6 +300,8 @@ This converts column numbers to the corresponding column names.
     $df->cols_to_names([3,1]);              # gives ['col3','col1']
     $df->cols_to_names([0..$df->ncol()-1]); # equiv to $df->names;
 
+If we give a string which does not belong to names, then it produces an error.
+
 ### rows($rows)
 
 This gives the specified rows ($rows).
@@ -442,11 +446,19 @@ Not yet.
 
 ### melt
 
-not yet
+This method converts a wide table to a long one.
+
+    $df->melt(id=>'col0',measure_vars=>$cols);
+
+The column names of the melted data frame would be ['col0','variable','value'].
 
 ### dcast
 
-not yet
+This method converts a long table to a wide one. 
+
+    $df->dcast(index=>'col0',columns=>'col1',values=>'col2',fill=>'0');
+
+(We follow the usage of pandas' pivot()-method.) If the 'fill' option is given, then the empty cells are filled by the specified value.
 
 ## methods corresponding to functions of dplyr in R
 
@@ -483,7 +495,7 @@ This gives a new data frame which is sorted by columns 'year', 'month' and 'day'
 - The rows are sorted in the ascending order.
 - The elemens of the specified column are assumed to be numeric.
 
-To sort the rows in descending order, put `["col1",desc=>1]` instead of "col1". To use "cmp" for comparison, put `["col1",cmp=>]` intead. The value of cmp accepts also a function refernce. For example, 
+To sort the rows in descending order, put `["col1",desc=>1]` instead of "col1". To use "cmp" for comparison, put `["col1",cmp=> ...]` intead. The value of cmp accepts also a function refernce. For example, 
 
     $df->arrange(["name",desc=>1,cmp=>sub {$_[0] cmp $_[1]}]);
 
@@ -567,7 +579,7 @@ When we want to use column names for the function references, use `mutate_th()`.
 
 Not yet implemented. Use mutate() and select().
 
-### summarise() 
+### summarise() (or summarize())
 
 This method produce a data frame consisting of a single row. In an example
 
@@ -581,9 +593,55 @@ We can give several triples:
 
     $df->summarise( ['ave0', \&func0, 'col0'] , ['ave1', \&func1, 'col1'], ...);
 
-### groupby
+## GroupBy object
 
-Not yet implemented.
+Roughly speaking, a (Arrow::)GroupBy object is an object like a data frame such that the last elements of rows are data frame with the same column names. The name of the last column is 'data_frame' and other column is called a 'level'. (This name is of course not general.) This object can be used to group a data frame by the values of specified columns.
+
+Note that **a GroupBy object is not a DataFrame object**.
+
+### group_by
+
+This method creates a GroupBy object. 
+
+    $grpd = $df->group_by('origin','cylinders');
+
+Then $grpd contains a data frame whose colunm names are 'origin', 'cylinders' and 'data_frame'. The first two columns (called 'levels') consist of distinct pairs of values of the two columns of $df. If the first two elements of a row is 1 and 8, then the third (last) element is a data frame given by 
+
+    $df->filter_th(sub {$_[0]{origin} == 1 && $_[0]{cylinders} == 8});
+
+### level_values
+
+    $grpd->level_values;
+
+This produces the data frame consisting only of levels columns. (The data frame is same as $df->distinct('origin','cylinders').)
+
+### cat
+
+This method is basically the inverse of group_by() (up to orders of columns). 
+
+    $grpd->cat;
+
+This produces a single data frame consisting of grouped data frames (and the level columns). 
+
+### summarise (or summarize)
+
+This method applies an aggregate function to the column of each grouped data frame and show the result as a single data frame.
+
+    $grpd->summarise(['sum_mpg',\&sum,'mpg']);
+
+This creates a data frame whose last column consists of the sums of the columns 'mpg' of all grouped data frame (if &sum is suitably defined). The column name is 'sum_mpg'.
+
+### filter(_th), slice, arrange, select, rename, distinct, mutate(_th)
+
+These methods give a GroupBy object. They apply the method of the same name as ones for DataFrame to each grouped data frame. The group whose data frame has no rows will be removed. For example 
+
+    $grpd->level_values;
+
+contains 9 rows, while
+
+    $grpd->filter_th(sub { $_[0]{name} =~ /honda/ })->level_values;
+
+contains only one row.
 
 # TODO
 

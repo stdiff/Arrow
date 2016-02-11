@@ -29,6 +29,7 @@ This Perl module provides a degenerated variant of a data frame in R. The names 
 
 ## ChangeLog
 
+- 2016/02/11 : Arrow::GroupBy is added
 - 2016/02/10 : the default value of `width` is set to 8
 - 2016/02/10 : `dcast()` and `melt()` are added
 - 2015/12/29 : select() preserves the given order
