@@ -42,6 +42,8 @@ sub score{
 ######################################################################## methods
 sub fit{
   use PDL::Slatec qw(matinv);
+  use PDL::NiceSlice;
+
   my $self = shift;
   return $self->{fit} if @_ == 0; # give the result of fitting if no arg.
 
@@ -59,7 +61,7 @@ sub fit{
   my $lambda = $self->{tuning}->{lambda};
   if ($lambda) {
     my $I = identity($p+1);
-    $I->(0,0) .= 0;
+    $I(0,0) .= 0;
     $beta =  matinv($Xt x $X + $lambda*$I) x $Xt x $y;
   } else {
     $beta =  matinv($Xt x $X) x $Xt x $y;
@@ -82,6 +84,14 @@ sub fit{
 
   # score (R^2 coefficient)
   $self->{fit}->{score} = 1 - $rss/sum(($y-avg($y))**2);
+
+  # cost (RSS+penalty)
+  my $penalty = 0;
+  if ($lambda) {
+    $penalty += $_**2 foreach (@coef);
+    $penalty *= $lambda;
+  }
+  $self->{fit}->{cost} = $rss + $penalty;
 
   return $self->{fit};
 }
