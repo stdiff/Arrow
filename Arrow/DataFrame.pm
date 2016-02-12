@@ -1,17 +1,15 @@
 package Arrow::DataFrame;
-# >Last Modified on Thu, 11 Feb 2016< 
+# >Last Modified on Fri, 12 Feb 2016< 
 use strict;
 use warnings;
 use utf8;
 use Carp;
 use Encode;
-use List::MoreUtils qw(uniq);
 use Text::CSV;
 # use Text::CSV::Encoded;
 use Math::MatrixReal;
 
 use Arrow::GroupBy;
-
 ######################################### Constructors
 sub new {
   my $class = shift;
@@ -725,6 +723,8 @@ sub melt {
 
 
 sub dcast {
+  use List::MoreUtils qw//;
+
   my $self = shift;
   my %pref = @_;
 
@@ -732,8 +732,8 @@ sub dcast {
   my $col_num = $self->names_to_cols($pref{columns}); # column number of vars
   my $val_num = $self->names_to_cols($pref{values});  # column number of vals
 
-  my @indexes = uniq @{$self->cols($pref{index})}; # array of IDs
-  my @names = uniq @{$self->cols($pref{columns})}; # array of vars
+  my @indexes = List::MoreUtils::uniq @{$self->cols($pref{index})}; # array of IDs
+  my @names = List::MoreUtils::uniq @{$self->cols($pref{columns})}; # array of vars
   @names = sort @names; # for compatibility with R
   my @columns = @names; # array of vars (except 'index')
   @names = ($self->cols_to_names($id_num),@names);
@@ -845,6 +845,7 @@ sub arrange {
 
 
 sub select {
+  # Should we check if given names are colunm names?
   my $self = shift;
   my @selected;
 
@@ -1046,11 +1047,13 @@ sub summarize {
 
 
 sub group_by {
+  use List::MoreUtils qw//;
+
   my $self = shift;
   my @levels = map { /^\d+$/ ? $self->cols_to_names->($_) : $_ } @_;
 
   my %level_values;
-  $level_values{$_} = [uniq @{$self->cols($_)}] foreach (@levels);
+  $level_values{$_} = [List::MoreUtils::uniq @{$self->cols($_)}] foreach (@levels);
 
   my @groups; 
   foreach my $level (@levels) { 
@@ -1118,6 +1121,14 @@ sub rearrange {
   return $df;
 }
 
+
+sub as_pdl {
+  use PDL qw(pdl);
+  my $self = shift;
+  return pdl($self->{rows});
+}
+
+
 ### as_matrix([2,3],[0,4,5]) returns the following 2x3 matrix
 ### x20 x24 x25
 ### x30 x34 x35
@@ -1148,76 +1159,6 @@ sub as_matrix {
 
   return Math::MatrixReal->new_from_rows(\@M);
 }
-
-
-### ---------------------------------------------------- 
-### - `$df->near_zero_var()`
-###   nearZeroVar() of caret in R.
-###   - freq_cut : the cutoff for the ratio (freq_ratio) of 
-###     the most common value to the second most common value
-###     (if the second one is 0, then the first one is the ratio)
-###   - uniqueCut : the cutoff for the percentage (percent_unique) of
-###     distinct values out of the number of total samples
-
-sub near_zero_var {
-  my $self = shift;
-  my $pref = shift;
-  $pref->{freq_cut} ||= 95/5;
-  $pref->{unique_cut} ||= 10;
-  $pref->{save_metrics} ||= 0; # not implimented yet
-
-  my $p = $self->ncol()-1;
-  my $n = $self->nrow();
-
-  my @freq_ratio;
-  my @percent_unique;
-  my @zero_var;
-  my @nzv;
-
-  foreach my $j (0..$p) {
-    my @col = grep { defined $_ } @{$self->columns($j)};
-    my @ucol = uniq @col;
-    $percent_unique[$j] = 100 * @ucol / $n;
-
-    if (@col <= 1) {
-      ### only undef (0) or the same value (1)
-      $zero_var[$j] = 1;
-      $freq_ratio[$j] = 0;
-    } else {
-      $zero_var[$j] = 0;
-
-      my %counter = ();
-      foreach my $val (@col) {
-	### count the appearing values
-	$counter{"$val"}++;
-      }
-      ### array of counts in descending order
-      my @values = sort { $b<=>$a } map { $counter{$_} } @ucol;
-      $freq_ratio[$j] = $values[0]/$values[1];
-    }
-
-    if ($freq_ratio[$j] > $pref->{freq_cut} && $percent_unique[$j] <= $pref->{unique_cut} or $zero_var[$j]) {
-      $nzv[$j] = 1;
-    } else {
-      $nzv[$j] = 0;
-    }
-  }
-
-  if ($pref->{save_metrix}) {
-    my $hashref = {
-      column         => $self->names,
-      freq_ratio     => \@freq_ratio,
-      percent_unique => \@percent_unique,
-      zero_var       => \@zero_var,
-      nzv            => \@nzv,
-    };
-    return DataFrame->hash_to_dataframe($hashref,[qw(column freq_ratio percent_unique zero_var nzv)]);
-  } else {
-    return [grep { $nzv[$_] } 0..$p];
-  }
-}
-
-
 
 
 ### -------------------------------------------------------- "private" methods
