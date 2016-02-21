@@ -1,5 +1,5 @@
 package Arrow::DataFrame;
-# >Last Modified on Fri, 12 Feb 2016< 
+# >Last Modified on Fri, 19 Feb 2016< 
 use strict;
 use warnings;
 use utf8;
@@ -341,6 +341,7 @@ sub names_to_cols {
       if (/^-?\d+$/) { $_ } else { $name_to_column->{$_} }
     } @$given_names];
   } else {
+
     if ($given_names =~ /^-?\d+$/) {
       return $given_names;
     } else {
@@ -1123,9 +1124,9 @@ sub rearrange {
 
 
 sub as_pdl {
-  use PDL qw(pdl);
+  use PDL qw //;
   my $self = shift;
-  return pdl($self->{rows});
+  return PDL->new($self->{rows});
 }
 
 
