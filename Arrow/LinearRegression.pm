@@ -1,5 +1,5 @@
 package Arrow::LinearRegression;
-# >Last Modified on Fri, 12 Feb 2016< 
+# >Last Modified on Sun, 21 Feb 2016< 
 use strict;
 use warnings;
 use utf8;
@@ -36,9 +36,6 @@ sub tuning{
   return $self->{tuning};
 }
 
-sub score{
-  return $_[0]->{fit}->{score};
-}
 ######################################################################## methods
 sub fit{
   use PDL::Slatec qw(matinv);
@@ -79,8 +76,8 @@ sub fit{
   # RSS
   my $rss = sum(($y-$yhat)**2);
 
-  # The mean squared error (MSE)
-  $self->{fit}->{mse} = sqrt($rss/$n);
+  # root of the mean squared error (RMSE)
+  $self->{fit}->{rmse} = sqrt($rss/$n);
 
   # score (R^2 coefficient)
   $self->{fit}->{score} = 1 - $rss/sum(($y-avg($y))**2);
@@ -110,5 +107,28 @@ sub predict{
   return $Xtot x $beta;
 }
 
+sub score{
+  # $estimator->score($X,$y_true,)
+  my $self = shift;
+  my $X = shift;
+  my $y_true = shift;
+  my $type = shift || 'R2';
+  croak 'Usage: $estimator->score($X,$y_true[,"rmse"])' if not defined $y_true;
+
+  my $yhat = $self->predict($X);
+
+  if ($type eq 'mean_squared_error') {
+    # Mean Squared Error
+    return avg(($y_true-$yhat)**2);
+  } elsif ($type eq 'neg_mse') {
+    # -(Mean Squared Error)
+    return -avg(($y_true-$yhat)**2);
+  } else {
+    # R2 
+    my $u = sum(($y_true-$yhat)**2);
+    my $v = sum(($y_true-avg($y_true))**2);
+    return 1-$u/$v;
+  }
+}
 
 1;
