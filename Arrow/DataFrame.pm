@@ -86,6 +86,9 @@ sub read_csv {
       ### We need to read the first line to find out the number of columns
       my $row0 = $csv->getline($fh); 
       my $p = $#$row0;
+      if ($na_strings) {
+	$row0 = [ map { $_ eq $na_strings ? undef : $_ } @$row0];
+      }
       $df = Arrow::DataFrame->new(rows=>[$row0], names=>[map { "X$_" } 0..$p])
     }
 
