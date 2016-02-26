@@ -1,5 +1,5 @@
 package Arrow::DataFrame;
-# >Last Modified on Fri, 19 Feb 2016< 
+# >Last Modified on Fri, 26 Feb 2016< 
 use strict;
 use warnings;
 use utf8;
@@ -65,6 +65,12 @@ sub read_csv {
     delete $pref->{header};
   }
 
+  my $na_strings = ""; # A string which will be recognised as NA
+  if (defined($pref->{na_strings})) {
+    $na_strings = $pref->{na_strings};
+    delete $pref->{na_strings};
+  }
+
   # my $csv = Text::CSV::Encoded->new($pref); # for Text::CSV::Encoded
   my $csv = Text::CSV->new($pref);
 
@@ -84,6 +90,9 @@ sub read_csv {
     }
 
     while (my $row = $csv->getline($fh)) {
+      if ($na_strings) {
+	$row = [ map { $_ eq $na_strings ? undef : $_ } @$row];
+      }
       $df = $df->rbind($row);
     }
     close $fh;
