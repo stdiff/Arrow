@@ -27,8 +27,15 @@ This Perl module provides a degenerated variant of a data frame in R. The names 
 
 	use Arrow::DataFrame;
 
+## Machine Learning with DataFrame.pm
+
+- [Linear/Ridge Regression](http://stdiff.net/?mb2016022101)
+- [Logisitic Regression](http://stdiff.net/?mb2016052201)
+
 ## ChangeLog
 
+- 2016/05/22 : Arrow::Optimizer, Arrow::PreProcessing, Arrow::LogisticRegression are added.
+- 2016/05/22 : Arrow::LabelEncoder is deleted. (This is integrated in Arrow::PreProcessing)
 - 2016/02/12 : Arrow::LabelEncoder and Arrow::LinearRegression are added
 - 2016/02/11 : Arrow::GroupBy is added
 - 2016/02/10 : the default value of `width` is set to 8
