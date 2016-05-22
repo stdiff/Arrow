@@ -1,16 +1,21 @@
 package Arrow::Model;
-# >Last Modified on Fri, 12 Feb 2016< 
+# >Last Modified on Sun, 22 May 2016< 
 use strict;
 use warnings;
 use utf8;
 use Carp;
 
 use Exporter qw(import);
-our @EXPORT = qw(LinearRegression);
+our @EXPORT = qw(LinearRegression LogisticRegression);
 
 sub LinearRegression {
   use Arrow::LinearRegression;
-  Arrow::LinearRegression->new(@_);
+  return Arrow::LinearRegression->new(@_);
+}
+
+sub LogisticRegression {
+  use Arrow::LogisticRegression;
+  return Arrow::LogisticRegression->new(@_);
 }
 
 1;
